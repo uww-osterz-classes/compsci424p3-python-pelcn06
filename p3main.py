@@ -2,6 +2,12 @@
 COMPSCI 424 Program 3
 Name: Noah Pelc
 """
+##################
+# SPOTS TO CHECK FOR i/j FLIPS
+# main - inits
+#   sanity checks
+# checkReduce - basically the whole things
+##################
 
 #General Instructions
 """
@@ -216,8 +222,9 @@ Total[m]
 
 import os
 import sys
-import threading # standard Python threading library
-
+import threading
+from typing import Concatenate # standard Python threading library
+"""
 # (Comments are just suggestions. Feel free to modify or delete them.)
 
 # When you start a thread with a call to "threading.Thread", you will
@@ -231,7 +238,7 @@ import threading # standard Python threading library
 # Most software engineers say global variables are a Bad Idea (and 
 # they're usually correct!), but systems programmers do it all the
 # time, so I'm allowing it here.
-
+"""
 
 # Let's write a main method at the top
 def main():
@@ -298,12 +305,6 @@ def main():
     Before continuing to the next part, your program should perform checks to ensure that all of the following conditions are true at the start for every process Pi 
     and every resource type Rj
 
-        
-
-
-
-
-
     If any of these conditions are false, the program should display an appropriate error message and then exit.
 
     If all of these conditions are true, then the program should continue to the next step.
@@ -312,7 +313,7 @@ def main():
     for i in range(0, num_resources, 1):
         for j in range(0, num_processes, 1):
              if Allocation[i][j] > P[i][j]:
-                sys.stderr.write("Not enough resources for this test!")
+                sys.stderr.write("Too many resources already taken!")
                 sys.exit(1)
                 
     """
@@ -331,28 +332,71 @@ def main():
 	    1. The system is in a safe state if and only if the system's claim graph is completely reducible, as shown in zyBook section 5.3.
 	    2. In your program, you should use the table-based approach in zyBook Participation Activity 5.3.5 to decide whether the system is in a safe state. You may want to move this code into its own method so you can call it repeatedly.
     """
-    if not checkReduce():
+    if not checkReduce(Allocation, Total, P, R):
         sys.stderr.write("This test is not started in a safe state.  Do better.")
         sys.exit(1)
-        
-    
-    
 
     # 5. Go into either manual or automatic mode, depending on
     # the value of args[0]; you could implement these two modes
     # as separate methods within this class, as separate classes
     # with their own main methods, or as additional code within
     # this main method.
+    """
+    Choose a mode: manual or automatic
+
+    Your program should be able to run in two different modes: manual mode if manual is given on the command line, or automatic mode if auto is given on the command line.
+    """
+    if sys.argv[1].lower() == "manual":
+        manualMode(Allocation, Total, P, R)
+    elif sys.argv[1].lower() == "auto":
+        pass
+    else:
+        sys.stderr.write("run mode not \"auto\" or \"manual\"")  
+        sys.exit(1)
 
 """
 	1. The system is in a safe state if and only if the system's claim graph is completely reducible, as shown in zyBook section 5.3.
 	2. In your program, you should use the table-based approach in zyBook Participation Activity 5.3.5 to decide whether the system is in a safe state. You may want to move this code into its own method so you can call it repeatedly.
 """
-def checkReduce(allocation[[]], total[], ):
-    reducible = False
-
-
-    return reducible
+def checkReduce(allocation, total, P, available, request = (0,0,0)):
+    num_resources = len(allocation)
+    num_processes = len(allocation[0])
+    removed = [1 for i in range(num_processes)]
+    processes_remaining = num_processes
+    
+    #tentatively grant request
+    available[request[1]] -= request[0]
+    allocation[request[2]][request[1]] += request[0]
+    
+    ###reduce graph
+    #for each round of reduction remaining
+    while processes_remaining > 0:
+        blocked = [num_processes]
+        for i in range(num_processes):
+            blocked[i] = removed[i]
+        #check for blocked processes
+        for i in range(num_processes):
+            for j in range(num_resources):
+                if available[i] < (P[i][j] - allocation[i][j]):
+                    blocked[j] = 0
+        #if there are no unblocked processes not reducible return false
+        test = 0
+        for x in blocked: 
+            test += x
+        if test == 0: return False
+        #remove unblocked processes from pool
+        for i in range(num_processes):
+            if blocked[i] == 1:
+                removed[i] = 0
+                processes_remaining -= 1
+                #return resources to available
+                for j in range(num_resources):
+                    available[j] += allocation[i][j]
+                    allocation[i][j] = 0
+        #reiterate to next round of reduction
+        
+    #if the while loop finishes, graph is fully reduced, request is granted    
+    return True            
 
 
 
@@ -375,8 +419,32 @@ For example, request 3 of 1 for 0 requests 3 units of resource R_1 for process p
 
 An end command word exits the program.
 """
-def manualMode():
+def manualMode(Allocation, Total, P, R):
+    command = ["begin"]
+    while command.lower() != "end":
+        command = input("enter a command: ").split()
+        if len(command) == 6:
+            request = (int(command[1]), int(command[3]), int(command[5]) )
+        
+        if command[0].lower() == "request":
+            if checkReduce(Allocation, Total, P, R, request):
+                Allocation[request[2]][request[1]] += request[0]
+                R[request[1]] -= request[0]
+                print("Process {} requests {} units of resource {}: granted".format(request[2], request[0], request[1]))
+            else: print("Process {} requests {} units of resource {}: denied".format(request[2], request[0], request[1]))
+            
+        elif command[0].lower() == "release":
+            R[request[1]] += request[0]
+            Allocation[request[2]][request[1]] -= request[0]
+            print("Process {} releases {} units of resource {}".format(request[2], request[0], request[1]))
+        
+        elif command[0].lower() == "end":
+            pass
+        else:
+            print("Please enter a command in the format 'request/release I of J for K', or type 'end' to quit.")
     
+
+
     return
 
 
