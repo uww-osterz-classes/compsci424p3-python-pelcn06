@@ -69,7 +69,7 @@ and every resource type Rj
 	(in English: You can't allocate more resources of a given type than actually exist.)
 	1. Theres really nothing to check here.  However, it might help you to create a Total array, where for each resource type Rj, Total[Rj] stores the total number of (available + allocated) instances of that resource type.
 
-3. The system is in a ssafe state.
+3. The system is in a safe state.
 	1. The system is in a safe state if and only if the system's claim graph is completely reducible, as shown in zyBook section 5.3.
 	2. In your program, you should use the table-based approach in zyBook Participation Activity 5.3.5 to decide whether the system is in a safe state. You may want to move this code into its own method so you can call it repeatedly.
 
@@ -302,9 +302,7 @@ def main():
 
 
 
-        3. The system is in a ssafe state.
-	        1. The system is in a safe state if and only if the system's claim graph is completely reducible, as shown in zyBook section 5.3.
-	        2. In your program, you should use the table-based approach in zyBook Participation Activity 5.3.5 to decide whether the system is in a safe state. You may want to move this code into its own method so you can call it repeatedly.
+
 
     If any of these conditions are false, the program should display an appropriate error message and then exit.
 
@@ -323,10 +321,19 @@ def main():
 	        1. Theres really nothing to check here.  However, it might help you to create a Total array, where for each resource type Rj, Total[Rj] stores the total number of (available + allocated) instances of that resource type.
     """
     for i in range(0, num_resources, 1):
+        sum = R[i]    
         for j in range(0, num_processes, 1):
-            if Allocation[i][j] > P[i][j]:
-                sys.stderr.write("You can't allocate more resources of a given type than actually exist.")
-                sys.exit(1)
+            sum += Allocation[i][j]
+        Total[i] = sum
+        
+    """
+    3. The system is in a safe state.
+	    1. The system is in a safe state if and only if the system's claim graph is completely reducible, as shown in zyBook section 5.3.
+	    2. In your program, you should use the table-based approach in zyBook Participation Activity 5.3.5 to decide whether the system is in a safe state. You may want to move this code into its own method so you can call it repeatedly.
+    """
+    if not checkReduce():
+        sys.stderr.write("This test is not started in a safe state.  Do better.")
+        sys.exit(1)
         
     
     
@@ -337,6 +344,60 @@ def main():
     # with their own main methods, or as additional code within
     # this main method.
 
-# fill in other methods here as desired
+"""
+	1. The system is in a safe state if and only if the system's claim graph is completely reducible, as shown in zyBook section 5.3.
+	2. In your program, you should use the table-based approach in zyBook Participation Activity 5.3.5 to decide whether the system is in a safe state. You may want to move this code into its own method so you can call it repeatedly.
+"""
+def checkReduce(allocation[[]], total[], ):
+    reducible = False
+
+
+    return reducible
+
+
+
+"""
+Manual mode
+
+In manual mode, your program should allow the user to enter any of the following three types of commands.
+
+request I of J for K
+release I of J for K
+end
+
+A request or release command word should be followed on the same line by
+
+   1. number of elements being requested (requests between 0 and Max[K][J], releases between 0 and Allocation[K][J]), then
+   2. the word of followed by the resource type ID being requested (between 0 and m-1), then
+   3. the word for followed by the process ID making the request (between 0 and n-1).
+
+For example, request 3 of 1 for 0 requests 3 units of resource R_1 for process p_0.
+
+An end command word exits the program.
+"""
+def manualMode():
+    
+    return
+
+
+"""
+Automatic mode
+
+In automatic mode, your program will apply the Banker's algorithm to a simulation of a multiprocess system. Your program must create one thread for each of the n processes ("customers") in the system that you are simulating.
+
+Each thread must randomly generate 3 request commands and 3 release commands for itself. Please do not hard-code these numbers.
+
+Within each thread, requests should alternate with releases: each request should be followed by one release.
+
+When each thread completes its 3 requests and 3 releases, that thread should terminate. The program ends after all threads terminate.
+
+Note that processes should not release all of their resources immediately after a request for more resources is granted. Both requests and releases should be randomly generated.
+
+The threads should be able to run in parallel if your system allows it. All threads will share the same set of arrays, so you will need to control access to the arrays using mutex locks, semaphores, or similar structures in order to ensure data integrity (unless you are writing in Rust).
+"""
+def autoMode():
+
+    return
+
 
 main() # call the main function
