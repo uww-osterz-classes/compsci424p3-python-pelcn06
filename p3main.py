@@ -254,14 +254,7 @@ def main():
     # 1. Open the setup file using the path in argv[2]
     num_resources = 0
     num_processes = 0
-    R = [] #Available
-    P = [[0 for x in range(num_resources)] for y in range(num_processes)] #Max
-    Allocation = [[0 for x in range(num_resources)] for y in range(num_processes)]
-    Request = [[0 for x in range(num_resources)] for y in range(num_processes)]
-    Need = [[0 for x in range(num_resources)] for y in range(num_processes)]
-    Work = []
-    Finish = []
-    Total = []
+    R, P, Allocation, Request, Need, Work, Finish, Total = 0, 0, 0, 0, 0, 0, 0, 0
     with open(sys.argv[2], 'r') as setup_file:
         # 2. Get the number of resources and processes from the setup
         # file, and use this info to create the Banker's Algorithm
@@ -273,25 +266,34 @@ def main():
 
         # 3. Use the rest of the setup file to initialize the data structures
         
+        R = [0]*num_resources #Available
+        P = [[0 for x in range(num_resources)] for y in range(num_processes)] #Max
+        Allocation = [[0 for x in range(num_resources)] for y in range(num_processes)]
+        Request = [[0 for x in range(num_resources)] for y in range(num_processes)]
+        Need = [[0 for x in range(num_resources)] for y in range(num_processes)]
+        Work = []
+        Finish = []
+        Total = [0]*num_resources
+        
         #R[m] - A 1-dimensional array of integers that stores the number of available (unallocated) units of each resource. Each entry R[j] or Available[j] records the number of units of resource R_j.
         dump = setup_file.readline()
         holder = setup_file.readline().split()
-        for i in range(0, num_resources, 1):
-            R[i] = holder[i]
+        for i in range(num_resources):
+            R[i] = int(holder[i])
             
         #P[n][m] (P[[m]n]) - A 2-dimensional array of integers that stores the maximum possible claim by each process for each type of resource. Each entry P[i][j] or Max[i][j] records the maximum number of units of resource R_j that process p_i will ever request.
         dump = setup_file.readline()    
         for i in range(0, num_processes, 1):
-            holder = setup_file.readline()
+            holder = setup_file.readline().split()
             for j in range(0, num_resources, 1):
-                P[i][j] = holder[j]
+                P[i][j] = int(holder[j])
         
         #Allocation[n][m] -  A 2-dimensional array of integers that shows how many units of each resource are currently allocated to each process. Each entry Allocation[i][j] records the number of units of resource R_j that are currently allocated to process p_i.
         dump = setup_file.readline()
         for i in range(0, num_processes, 1):
-            holder = setup_file.readline()
+            holder = setup_file.readline().split()
             for j in range(0, num_resources, 1):
-                Allocation[i][j] = holder[i][j]
+                Allocation[i][j] = int(holder[j])
               
 
     
@@ -310,8 +312,8 @@ def main():
     If all of these conditions are true, then the program should continue to the next step.
     """
     # 1. Allocation[Pi][Rj] <= Maximum[Pi][Rj]
-    for i in range(0, num_resources, 1):
-        for j in range(0, num_processes, 1):
+    for i in range(0, num_processes, 1):
+        for j in range(0, num_resources, 1):
              if Allocation[i][j] > P[i][j]:
                 sys.stderr.write("Too many resources already taken!")
                 sys.exit(1)
@@ -324,7 +326,7 @@ def main():
     for i in range(0, num_resources, 1):
         sum = R[i]    
         for j in range(0, num_processes, 1):
-            sum += Allocation[i][j]
+            sum += Allocation[j][i]
         Total[i] = sum
         
     """
@@ -332,6 +334,7 @@ def main():
 	    1. The system is in a safe state if and only if the system's claim graph is completely reducible, as shown in zyBook section 5.3.
 	    2. In your program, you should use the table-based approach in zyBook Participation Activity 5.3.5 to decide whether the system is in a safe state. You may want to move this code into its own method so you can call it repeatedly.
     """
+    print(Allocation)
     if not checkReduce(Allocation, Total, P, R):
         sys.stderr.write("This test is not started in a safe state.  Do better.")
         sys.exit(1)
@@ -347,6 +350,7 @@ def main():
     Your program should be able to run in two different modes: manual mode if manual is given on the command line, or automatic mode if auto is given on the command line.
     """
     if sys.argv[1].lower() == "manual":
+        print("Allocation: {}\nTotal: {}\nMax: {}\nAvailable: {}".format(Allocation, Total, P, R))
         manualMode(Allocation, Total, P, R)
     elif sys.argv[1].lower() == "auto":
         pass
@@ -359,10 +363,15 @@ def main():
 	2. In your program, you should use the table-based approach in zyBook Participation Activity 5.3.5 to decide whether the system is in a safe state. You may want to move this code into its own method so you can call it repeatedly.
 """
 def checkReduce(allocation, total, P, available, request = (0,0,0)):
-    num_resources = len(allocation)
-    num_processes = len(allocation[0])
+    num_resources = len(allocation[0])
+    num_processes = len(allocation)
     removed = [1 for i in range(num_processes)]
     processes_remaining = num_processes
+    #########################################
+    #DEEP COPY THE MULTIDIMENSIONAL BEINGS
+    #########################################
+    A = allocation.copy()
+    res_remaining = available.copy()
     
     #tentatively grant request
     available[request[1]] -= request[0]
@@ -371,14 +380,14 @@ def checkReduce(allocation, total, P, available, request = (0,0,0)):
     ###reduce graph
     #for each round of reduction remaining
     while processes_remaining > 0:
-        blocked = [num_processes]
+        blocked = [0]*num_processes
         for i in range(num_processes):
             blocked[i] = removed[i]
         #check for blocked processes
         for i in range(num_processes):
             for j in range(num_resources):
-                if available[i] < (P[i][j] - allocation[i][j]):
-                    blocked[j] = 0
+                if res_remaining[j] < (P[i][j] - A[i][j]):
+                    blocked[i] = 0
         #if there are no unblocked processes not reducible return false
         test = 0
         for x in blocked: 
@@ -391,8 +400,8 @@ def checkReduce(allocation, total, P, available, request = (0,0,0)):
                 processes_remaining -= 1
                 #return resources to available
                 for j in range(num_resources):
-                    available[j] += allocation[i][j]
-                    allocation[i][j] = 0
+                    res_remaining[j] += A[i][j]
+                    A[i][j] = 0
         #reiterate to next round of reduction
         
     #if the while loop finishes, graph is fully reduced, request is granted    
@@ -421,8 +430,11 @@ An end command word exits the program.
 """
 def manualMode(Allocation, Total, P, R):
     command = ["begin"]
-    while command.lower() != "end":
+    while command[0].lower() != "end":
+        print("Current Allocations: {}".format(Allocation))
+        print("max requests: {}".format(P))
         command = input("enter a command: ").split()
+        print(command)
         if len(command) == 6:
             request = (int(command[1]), int(command[3]), int(command[5]) )
         
