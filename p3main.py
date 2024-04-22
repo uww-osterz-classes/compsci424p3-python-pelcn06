@@ -2,12 +2,6 @@
 COMPSCI 424 Program 3
 Name: Noah Pelc
 """
-##################
-# SPOTS TO CHECK FOR i/j FLIPS
-# main - inits
-#   sanity checks
-# checkReduce - basically the whole things
-##################
 
 #General Instructions
 """
@@ -222,8 +216,7 @@ Total[m]
 
 import os
 import sys
-import threading
-from typing import Concatenate # standard Python threading library
+import threading # standard Python threading library
 """
 # (Comments are just suggestions. Feel free to modify or delete them.)
 
@@ -367,15 +360,12 @@ def checkReduce(allocation, total, P, available, request = (0,0,0)):
     num_processes = len(allocation)
     removed = [1 for i in range(num_processes)]
     processes_remaining = num_processes
-    #########################################
-    #DEEP COPY THE MULTIDIMENSIONAL BEINGS
-    #########################################
-    A = allocation.copy()
+    A = [list(row) for row in allocation]
     res_remaining = available.copy()
     
     #tentatively grant request
-    available[request[1]] -= request[0]
-    allocation[request[2]][request[1]] += request[0]
+    res_remaining[request[1]] -= request[0]
+    A[request[2]][request[1]] += request[0]
     
     ###reduce graph
     #for each round of reduction remaining
@@ -430,13 +420,16 @@ An end command word exits the program.
 """
 def manualMode(Allocation, Total, P, R):
     command = ["begin"]
+    num_resources = len(Allocation[0])
+    num_processes = len(Allocation)
     while command[0].lower() != "end":
         print("Current Allocations: {}".format(Allocation))
         print("max requests: {}".format(P))
         command = input("enter a command: ").split()
         print(command)
-        if len(command) == 6:
-            request = (int(command[1]), int(command[3]), int(command[5]) )
+        if len(command) == 6 and int(command[3]) < num_resources and int(command[5]) < num_processes and int(command[1]) < P[int(command[5])][int(command[3])]:
+            request = (int(command[1]), int(command[3]), int(command[5]) ) ############FIX THIS THE LOGIC IS BROKEN
+        else: command = ["begin"]
         
         if command[0].lower() == "request":
             if checkReduce(Allocation, Total, P, R, request):
