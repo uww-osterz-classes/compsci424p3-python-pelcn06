@@ -214,9 +214,12 @@ Total[m]
 """
 
 
+from ast import Try
 import os
 import sys
 import threading # standard Python threading library
+import random
+import time
 """
 # (Comments are just suggestions. Feel free to modify or delete them.)
 
@@ -331,22 +334,22 @@ def main():
     if not checkReduce(Allocation, Total, P, R):
         sys.stderr.write("This test is not started in a safe state.  Do better.")
         sys.exit(1)
-
+    """
     # 5. Go into either manual or automatic mode, depending on
     # the value of args[0]; you could implement these two modes
     # as separate methods within this class, as separate classes
     # with their own main methods, or as additional code within
     # this main method.
     """
+    """
     Choose a mode: manual or automatic
 
     Your program should be able to run in two different modes: manual mode if manual is given on the command line, or automatic mode if auto is given on the command line.
     """
     if sys.argv[1].lower() == "manual":
-        print("Allocation: {}\nTotal: {}\nMax: {}\nAvailable: {}".format(Allocation, Total, P, R))
         manualMode(Allocation, Total, P, R)
     elif sys.argv[1].lower() == "auto":
-        pass
+        autoMode(num_processes, num_resources, Request, P)
     else:
         sys.stderr.write("run mode not \"auto\" or \"manual\"")  
         sys.exit(1)
@@ -356,16 +359,22 @@ def main():
 	2. In your program, you should use the table-based approach in zyBook Participation Activity 5.3.5 to decide whether the system is in a safe state. You may want to move this code into its own method so you can call it repeatedly.
 """
 def checkReduce(allocation, total, P, available, request = (0,0,0)):
+    print("\n",type(request), request)
     num_resources = len(allocation[0])
     num_processes = len(allocation)
     removed = [1 for i in range(num_processes)]
     processes_remaining = num_processes
-    A = [list(row) for row in allocation]
+    Allocated = [list(row) for row in allocation]
     res_remaining = available.copy()
+    
+    #sanity check
+    #if request is greater than resources available or the request plus allocated resources is greater than max requested
+    if request[0] > available[request[1]] or request[0] + Allocated[request[2]][request[1]] > P[request[2]][request[1]]:
+        return False
     
     #tentatively grant request
     res_remaining[request[1]] -= request[0]
-    A[request[2]][request[1]] += request[0]
+    Allocated[request[2]][request[1]] += request[0]
     
     ###reduce graph
     #for each round of reduction remaining
@@ -376,7 +385,7 @@ def checkReduce(allocation, total, P, available, request = (0,0,0)):
         #check for blocked processes
         for i in range(num_processes):
             for j in range(num_resources):
-                if res_remaining[j] < (P[i][j] - A[i][j]):
+                if res_remaining[j] < (P[i][j] - Allocated[i][j]):
                     blocked[i] = 0
         #if there are no unblocked processes not reducible return false
         test = 0
@@ -390,8 +399,8 @@ def checkReduce(allocation, total, P, available, request = (0,0,0)):
                 processes_remaining -= 1
                 #return resources to available
                 for j in range(num_resources):
-                    res_remaining[j] += A[i][j]
-                    A[i][j] = 0
+                    res_remaining[j] += Allocated[i][j]
+                    Allocated[i][j] = 0
         #reiterate to next round of reduction
         
     #if the while loop finishes, graph is fully reduced, request is granted    
@@ -423,13 +432,20 @@ def manualMode(Allocation, Total, P, R):
     num_resources = len(Allocation[0])
     num_processes = len(Allocation)
     while command[0].lower() != "end":
+        print("\navailable resources: {}".format(R))
         print("Current Allocations: {}".format(Allocation))
         print("max requests: {}".format(P))
         command = input("enter a command: ").split()
-        print(command)
-        if len(command) == 6 and int(command[3]) < num_resources and int(command[5]) < num_processes and int(command[1]) < P[int(command[5])][int(command[3])]:
-            request = (int(command[1]), int(command[3]), int(command[5]) ) ############FIX THIS THE LOGIC IS BROKEN
-        else: command = ["begin"]
+        request = (0,0,0)
+        
+        if len(command) == 6:
+            try: 
+                request = (int(command[1]), int(command[3]), int(command[5]) )
+            except: 
+                print("\nplease use numbers for your request.\n")
+                command[0] = "begin"
+        elif len(command) < 1: command = ["begin"]
+        elif command[0] != "end": command = ["begin"]
         
         if command[0].lower() == "request":
             if checkReduce(Allocation, Total, P, R, request):
@@ -439,9 +455,10 @@ def manualMode(Allocation, Total, P, R):
             else: print("Process {} requests {} units of resource {}: denied".format(request[2], request[0], request[1]))
             
         elif command[0].lower() == "release":
-            R[request[1]] += request[0]
-            Allocation[request[2]][request[1]] -= request[0]
-            print("Process {} releases {} units of resource {}".format(request[2], request[0], request[1]))
+            if request[0] <= Allocation[request[2]][request[1]] and request[0] >= 0: 
+                R[request[1]] += request[0]
+                Allocation[request[2]][request[1]] -= request[0]
+                print("Process {} releases {} units of resource {}".format(request[2], request[0], request[1]))
         
         elif command[0].lower() == "end":
             pass
@@ -468,9 +485,45 @@ Note that processes should not release all of their resources immediately after 
 
 The threads should be able to run in parallel if your system allows it. All threads will share the same set of arrays, so you will need to control access to the arrays using mutex locks, semaphores, or similar structures in order to ensure data integrity (unless you are writing in Rust).
 """
-def autoMode():
-
+def autoMode(num_processes, num_resources, requests, max_resources):
+    procs = []*num_processes
+    running = [False]*num_processes
+    for i in range(num_processes):
+        procs[i] = threading.Thread(target=autoCustomer, args=(i, num_processes, num_resources, running, requests))
+    
+    #SOMETHING IN HERE ABOUT CHECKREDUCE ON REQUESTS BUT HOW TO PRIORITIZE OR ORDER THEM?????
+        
+    done = True
+    while not done:
+        done = True
+        for x in running:
+            if x == True:
+                done = False
+        time.sleep(1)
+    
     return
 
+def autoCustomer(proc_id, num_processes, num_resources, running, max_requests, request_array):
+    running[proc_id] = True
+    requests = [(0,0)]*3
+    releases = [(0,0)]*3
+    #Generate 3 requests, the sum of which cannot exceed max value - allocation
+        #rand max - allocated - sum of current requests
+    #generate 3 releases, each less than the sum of the matching requests
+        #rand allocated + sum of previous requests - previous releases
+    #for i in range(3)
+        #random reasonable wait time
+        #mutex operation
+        #send request (update requests array)
+            #request_array[proc_id][requests[i][1]] = requests[i][0]
+            #??????????? WAIT FOR RESPONSE OR SOMETHING?????
+        #random reasonable wait time
+        #release mutex
+        #send release
+            #Any wait conditions here?
+    
+
+    running[proc_id] = False
+    return
 
 main() # call the main function
