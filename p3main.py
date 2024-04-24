@@ -218,7 +218,7 @@ from ast import Try
 import os
 import sys
 import threading # standard Python threading library
-import random
+from random import randint
 import time
 """
 # (Comments are just suggestions. Feel free to modify or delete them.)
@@ -349,7 +349,7 @@ def main():
     if sys.argv[1].lower() == "manual":
         manualMode(Allocation, Total, P, R)
     elif sys.argv[1].lower() == "auto":
-        autoMode(num_processes, num_resources, Request, P)
+        autoMode(num_processes, num_resources, P, R)
     else:
         sys.stderr.write("run mode not \"auto\" or \"manual\"")  
         sys.exit(1)
@@ -440,7 +440,7 @@ def manualMode(Allocation, Total, P, R):
         
         if len(command) == 6:
             try: 
-                request = (int(command[1]), int(command[3]), int(command[5]) )
+                request = (int(command[1]), int(command[3]), int(command[5]) ) #(1 of 1 for 1)
             except: 
                 print("\nplease use numbers for your request.\n")
                 command[0] = "begin"
@@ -485,13 +485,12 @@ Note that processes should not release all of their resources immediately after 
 
 The threads should be able to run in parallel if your system allows it. All threads will share the same set of arrays, so you will need to control access to the arrays using mutex locks, semaphores, or similar structures in order to ensure data integrity (unless you are writing in Rust).
 """
-def autoMode(num_processes, num_resources, requests, max_resources):
+def autoMode(num_processes, num_resources, max_requests, allocated):
     procs = []*num_processes
     running = [False]*num_processes
     for i in range(num_processes):
-        procs[i] = threading.Thread(target=autoCustomer, args=(i, num_processes, num_resources, running, requests))
-    
-    #SOMETHING IN HERE ABOUT CHECKREDUCE ON REQUESTS BUT HOW TO PRIORITIZE OR ORDER THEM?????
+        procs[i] = threading.Thread(target=autoCustomer, args=(i, num_processes, num_resources, running, max_requests, allocated))
+        procs[i].start()
         
     done = True
     while not done:
@@ -499,26 +498,35 @@ def autoMode(num_processes, num_resources, requests, max_resources):
         for x in running:
             if x == True:
                 done = False
-        time.sleep(1)
+        time.sleep(4)
     
     return
 
-def autoCustomer(proc_id, num_processes, num_resources, running, max_requests, request_array):
+def autoCustomer(proc_id, num_processes, num_resources, running, max_requests, allocated):
     running[proc_id] = True
-    requests = [(0,0)]*3
-    releases = [(0,0)]*3
-    #Generate 3 requests, the sum of which cannot exceed max value - allocation
+    requests = [(0,0, proc_id)]*3 #1 of 1 for 1
+    releases = [(0,0, proc_id)]*3
+    request_sum = [0]*num_processes
+    release_sum = [0]*num_processes
+    #Generate 3 requests, the sum of which cannot exceed max_requests[proc_id][choice] - allocation[proc_id][choice]
+    for i in range(3):
+        choice = randint(0, num_processes - 1)
+        quantity = 0
+        #while loop to continue randoming until quantity can be above 0
+        while (max_requests[proc_id][choice] - allocated[proc_id][choice] - request_sum[choice]) <= 0:
+            choice = randint(0, num_processes - 1)
+        quantity = randint(1, max_requests[proc_id][choice] - allocated[proc_id][choice] - request_sum[choice])
+        requests[i] = ()
+        request_sum[choice] += quantity
         #rand max - allocated - sum of current requests
     #generate 3 releases, each less than the sum of the matching requests
         #rand allocated + sum of previous requests - previous releases
     #for i in range(3)
         #random reasonable wait time
         #mutex operation
-        #send request (update requests array)
-            #request_array[proc_id][requests[i][1]] = requests[i][0]
-            #??????????? WAIT FOR RESPONSE OR SOMETHING?????
-        #random reasonable wait time
+        #send request (run checkReduce with request[i])
         #release mutex
+        #random reasonable wait time
         #send release
             #Any wait conditions here?
     
