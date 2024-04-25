@@ -214,7 +214,6 @@ Total[m]
 """
 
 
-from ast import Try
 import os
 import sys
 import threading # standard Python threading library
@@ -235,8 +234,11 @@ import time
 # they're usually correct!), but systems programmers do it all the
 # time, so I'm allowing it here.
 """
-
+occupied = False
 # Let's write a main method at the top
+def getOccupiedStatus():
+    return occupied
+
 def main():
     # Code to test command-line argument processing.
     # You can keep, modify, or remove this. It's not required.
@@ -330,7 +332,6 @@ def main():
 	    1. The system is in a safe state if and only if the system's claim graph is completely reducible, as shown in zyBook section 5.3.
 	    2. In your program, you should use the table-based approach in zyBook Participation Activity 5.3.5 to decide whether the system is in a safe state. You may want to move this code into its own method so you can call it repeatedly.
     """
-    print(Allocation)
     if not checkReduce(Allocation, Total, P, R):
         sys.stderr.write("This test is not started in a safe state.  Do better.")
         sys.exit(1)
@@ -349,7 +350,7 @@ def main():
     if sys.argv[1].lower() == "manual":
         manualMode(Allocation, Total, P, R)
     elif sys.argv[1].lower() == "auto":
-        autoMode(num_processes, num_resources, P, R)
+        autoMode(num_processes, num_resources, P, R, Total, Allocation)
     else:
         sys.stderr.write("run mode not \"auto\" or \"manual\"")  
         sys.exit(1)
@@ -359,7 +360,6 @@ def main():
 	2. In your program, you should use the table-based approach in zyBook Participation Activity 5.3.5 to decide whether the system is in a safe state. You may want to move this code into its own method so you can call it repeatedly.
 """
 def checkReduce(allocation, total, P, available, request = (0,0,0)):
-    print("\n",type(request), request)
     num_resources = len(allocation[0])
     num_processes = len(allocation)
     removed = [1 for i in range(num_processes)]
@@ -403,7 +403,7 @@ def checkReduce(allocation, total, P, available, request = (0,0,0)):
                     Allocated[i][j] = 0
         #reiterate to next round of reduction
         
-    #if the while loop finishes, graph is fully reduced, request is granted    
+    #if the while loop finishes, graph is fully reduced, request is granted
     return True            
 
 
@@ -485,52 +485,87 @@ Note that processes should not release all of their resources immediately after 
 
 The threads should be able to run in parallel if your system allows it. All threads will share the same set of arrays, so you will need to control access to the arrays using mutex locks, semaphores, or similar structures in order to ensure data integrity (unless you are writing in Rust).
 """
-def autoMode(num_processes, num_resources, max_requests, allocated):
-    procs = []*num_processes
+def autoMode(num_processes, num_resources, max_requests, available, total, allocated):
+    procs = []
     running = [False]*num_processes
     for i in range(num_processes):
-        procs[i] = threading.Thread(target=autoCustomer, args=(i, num_processes, num_resources, running, max_requests, allocated))
+        procs.append(threading.Thread(target=autoCustomer, args=(i, num_processes, num_resources, running, max_requests, allocated, total, available)))
         procs[i].start()
         
-    done = True
+    done = False
     while not done:
         done = True
-        for x in running:
-            if x == True:
+        for x in range(len(running)):
+            if running[x] == True:
                 done = False
-        time.sleep(4)
+        if done == False:   time.sleep(4)
     
     return
 
-def autoCustomer(proc_id, num_processes, num_resources, running, max_requests, allocated):
+def autoCustomer(proc_id, num_processes, num_resources, running, max_requests, allocated, total, available):
     running[proc_id] = True
-    requests = [(0,0, proc_id)]*3 #1 of 1 for 1
-    releases = [(0,0, proc_id)]*3
-    request_sum = [0]*num_processes
-    release_sum = [0]*num_processes
-    #Generate 3 requests, the sum of which cannot exceed max_requests[proc_id][choice] - allocation[proc_id][choice]
-    for i in range(3):
-        choice = randint(0, num_processes - 1)
-        quantity = 0
-        #while loop to continue randoming until quantity can be above 0
-        while (max_requests[proc_id][choice] - allocated[proc_id][choice] - request_sum[choice]) <= 0:
-            choice = randint(0, num_processes - 1)
-        quantity = randint(1, max_requests[proc_id][choice] - allocated[proc_id][choice] - request_sum[choice])
-        requests[i] = ()
-        request_sum[choice] += quantity
-        #rand max - allocated - sum of current requests
-    #generate 3 releases, each less than the sum of the matching requests
-        #rand allocated + sum of previous requests - previous releases
-    #for i in range(3)
-        #random reasonable wait time
-        #mutex operation
-        #send request (run checkReduce with request[i])
-        #release mutex
-        #random reasonable wait time
-        #send release
-            #Any wait conditions here?
+    request = (0,0, proc_id) #1 of 1 for 1
+    release = (0,0, proc_id)
+    blank = [0]*num_resources
     
+    #generate 3 requests and releases and send each immediately
+    for i in range(3):
+        #Generate request, the sum of which cannot exceed max_requests[proc_id][choice] - allocation[proc_id][choice]        
+        choice = randint(0, num_resources - 1)
+        quantity = 0
+        
+        #while loop to continue randoming until quantity of request can be above 0
+        while (max_requests[proc_id][choice] - allocated[proc_id][choice]) <= 0:  choice = randint(0, num_resources - 1)
+        quantity = randint(1, max_requests[proc_id][choice] - allocated[proc_id][choice])
+        request = (quantity, choice, proc_id)
+        
+        #send newly generated request if arrays are unoccupied, otherwise back off 1-5 seconds and try again.  Do not react to results
+        requested = False
+        while not requested:
+            if not getOccupiedStatus():
+                occupied = True
+                if checkReduce(allocated, total, max_requests, available, request):
+                    #make the requested changes if reducible
+                    allocated[request[2]][request[1]] += request[0]
+                    available[request[1]] -= request[0]
+                    print("request for {}: granted".format(request))
+                    pass
+                else: print("request for {}: denied".format(request))
+                occupied = False
+                requested = True
+            else: time.wait(randint(1,5))
+        
+        #sanity check to prevent infinite looping for processes with no resource to release    
+        hasResources = False
+        for i in range(num_resources):
+            if allocated[proc_id][i] > 0:
+                hasResources = True
 
+        time.sleep(randint(0,4))
+        if hasResources:
+            choice = randint(0, num_resources - 1)
+            quantity = 0
+            #while loop to ensure there are resources to release
+            while allocated[proc_id][choice] == 0: 
+                choice = randint(0, num_resources - 1); 
+            quantity = randint(1, allocated[proc_id][choice])
+            release = (quantity, choice, proc_id)
+            #send newly generated release if arrays are unoccupied, otherwise back off 0-4 seconds and try again.
+            released = False
+            while not released:
+                if not getOccupiedStatus():
+                    occupied = True
+                    #make requested release
+                    allocated[release[2]][release[1]] -= release[0]
+                    available[release[1]] += release[0]
+                    occupied = False
+                    released = True
+                    print("released ", release)
+                time.wait(randint(0,4))
+        else:
+            print("{} has no resources and skipped releasing".format(proc_id,allocated[proc_id]))
+    
+    print("{} has finished!".format(proc_id))
     running[proc_id] = False
     return
 
