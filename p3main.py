@@ -503,6 +503,7 @@ def autoMode(num_processes, num_resources, max_requests, available, total, alloc
     return
 
 def autoCustomer(proc_id, num_processes, num_resources, running, max_requests, allocated, total, available):
+    time.sleep(randint(0,5))
     running[proc_id] = True
     request = (0,0, proc_id) #1 of 1 for 1
     release = (0,0, proc_id)
@@ -561,9 +562,9 @@ def autoCustomer(proc_id, num_processes, num_resources, running, max_requests, a
                     occupied = False
                     released = True
                     print("released ", release)
-                time.wait(randint(0,4))
+                time.sleep(randint(0,4))
         else:
-            print("{} has no resources and skipped releasing".format(proc_id,allocated[proc_id]))
+            print("{} has no resources and skipped releasing".format(proc_id))
     
     print("{} has finished!".format(proc_id))
     running[proc_id] = False
